@@ -241,12 +241,23 @@ class Transformer(nn.Module):
         src_flatten = torch.cat(src_flatten, 1)  # bs, \sum{hxw}, c
         mask_flatten = torch.cat(mask_flatten, 1)  # bs, \sum{hxw}
         lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)  # bs, \sum{hxw}, c
+                
         spatial_shapes = torch.as_tensor(
-            spatial_shapes, dtype=torch.long, device=src_flatten.device
+            spatial_shapes, dtype=torch.long, device=src_flatten.device            
         )
+        
+        # [Start] custom change for MPS
+        if (src_flatten.device.type == "mps" ):
+            spatial_shape_cumsum = spatial_shapes.prod(1).to(torch.int32).cumsum(0)[:-1]
+        else:
+            spatial_shape_cumsum = spatial_shapes.prod(1).to(torch.int32).cumsum(0)[:-1]
+        
         level_start_index = torch.cat(
-            (spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1])
+            #(spatial_shapes.new_zeros((1,)), spatial_shapes.prod(1).cumsum(0)[:-1])
+            (spatial_shapes.new_zeros((1,)), spatial_shape_cumsum)
         )
+        # [End] custom change for MPS
+        
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # two stage
